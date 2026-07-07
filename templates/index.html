@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Подсчет уток</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #fcfcfc; }
+        .controls { margin-bottom: 25px; padding: 20px; background: #f0f4f8; border-radius: 8px; border: 1px solid #d0d7de; }
+        button { padding: 10px 20px; cursor: pointer; margin-right: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        .report-btn { background-color: #28a745; }
+        .report-btn:hover { background-color: #218838; }
+        .download-video-btn { background-color: #17a2b8; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; display: inline-block; margin-top: 10px; font-weight: bold; }
+        .download-video-btn:hover { background-color: #138496; }
+        
+        .result-card { background: white; border: 1px solid #e1e4e8; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .result-card h4 { margin: 0 0 10px 0; color: #333; }
+        .result-card p { font-size: 16px; margin: 5px 0; color: #555; }
+        .result-card img { max-width: 100%; height: auto; border-radius: 6px; margin-top: 10px; border: 1px solid #ddd; }
+        .loading { font-size: 18px; color: #666; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Подсчет уток</h1>
+    
+    <div class="controls">
+        <input type="file" id="imageInput" accept="image/*,video/*" multiple>
+        <button onclick="processImages()">Запустить обработку</button>
+        <button class="report-btn" onclick="window.location.href='/report'">Скачать отчет с фото (Excel)</button>
+    </div>
+
+    <div id="resultsContainer"></div>
+
+    <script>
+        async function processImages() {
+            const fileInput = document.getElementById('imageInput');
+            if (fileInput.files.length === 0) {
+                alert("Пожалуйста, выберите хотя бы один файл!");
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('images', fileInput.files[i]);
+            }
+
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = "<p class='loading'>Идет анализ медиафайлов нейросетью. Для видео это может занять чуть больше времени...</p>";
+            
+            try {
+                const response = await fetch('/process', { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                container.innerHTML = ""; 
+                
+                data.results.forEach(result => {
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    
+                    if (result.is_video) {
+                        card.innerHTML = `
+                            <h4>Имя видеофайла: ${result.filename}</h4>
+                            <p><strong>Результат: пиковое (максимальное) число уток в кадре — ${result.count}</strong></p>
+                            <a href="${result.video_url}" class="download-video-btn" download>📥 Скачать обработанное видео (.mp4)</a>
+                            <p style="margin-top:15px; font-weight:bold; color:#666;">Кадр с максимальным скоплением уток:</p>
+                            <img src="${result.image_url}?${Date.now()}" alt="Лучший кадр видео">
+                        `;
+                    } else {
+                        card.innerHTML = `
+                            <h4>Имя файла: ${result.filename}</h4>
+                            <p><strong>Результат: обнаружено уток — ${result.count}</strong></p>
+                            <img src="${result.image_url}?${Date.now()}" alt="Результат детекции">
+                        `;
+                    }
+                    container.appendChild(card);
+                });
+                
+            } catch (error) {
+                container.innerHTML = "<p class='loading' style='color: red;'>Произошла ошибка при обработке данных!</p>";
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
